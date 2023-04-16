@@ -109,6 +109,8 @@ def set_up_mqtt(pool):
     mqtt_client = MQTT.MQTT(
         broker=secrets["broker"],
         port=secrets["port"],
+        username=secrets["broker_username"],
+        password=secrets["broker_password"],
         socket_pool=pool,
         is_ssl=False
     )
