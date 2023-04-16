@@ -8,12 +8,12 @@ import storage, os, board, json
 from binascii import hexlify
 import time
 
-
 ID = config['ID']
 SAT = GS.SATELLITE[config['SAT']]
 DATA_TOPIC = secrets['data']
-STATUS_TOPIC =  secrets['status'] + ID
-REMOTE_TOPIC =  secrets['remote'] + ID
+STATUS_TOPIC = secrets['status'] + ID
+REMOTE_TOPIC = secrets['remote'] + ID
+
 
 def synctime(pool):
     try:
@@ -50,13 +50,14 @@ def synctime(pool):
     except Exception as e:
         print('[WARNING]', e)
 
+
 def attempt_wifi():
     # TODO: Move wifi pass and id to config
     # try connecting to wifi
     print("Connecting to WiFi...")
     try:
         wifi.radio.connect(ssid=secrets['homeSSID'], password=secrets['homePass'])
-        #wifi.radio.connect(ssid="Stanford") # open network
+        # wifi.radio.connect(ssid="Stanford") # open network
         print("Signal: {}".format(wifi.radio.ap_info.rssi))
         # Create a socket pool
         pool = socketpool.SocketPool(wifi.radio)
@@ -68,6 +69,7 @@ def attempt_wifi():
     else:
         return pool
 
+
 def get_new_messages():
     '''
     Req: Must be called before radios are initialized, otherwise will fail
@@ -75,7 +77,7 @@ def get_new_messages():
     new_messages = {}
     if alarm.wake_alarm:
         # hacky way of checking the radios without initalizing the hardware
-        for r, cs in GS.radios.items(): # This uses a temporary list
+        for r, cs in GS.radios.items():  # This uses a temporary list
             if GS.rx_done(cs):
                 print(r, end=": ")
                 for msg in GS.get_msg2(cs):
@@ -102,13 +104,14 @@ def get_new_messages():
         radios = GS.init_radios(SAT)
         return new_messages
 
+
 def set_up_mqtt(pool):
     mqtt_client = MQTT.MQTT(
-            broker=secrets["broker"],
-            port=secrets["port"],
-            socket_pool=pool,
-            is_ssl=False
-        )
+        broker=secrets["broker"],
+        port=secrets["port"],
+        socket_pool=pool,
+        is_ssl=False
+    )
     mqtt_client.on_connect = connected
     mqtt_client.on_message = mqtt_message
     mqtt_client.on_subscribe = subscribe
@@ -125,40 +128,44 @@ def set_up_mqtt(pool):
 
     mqtt_client.connect()
     mqtt_client.subscribe(REMOTE_TOPIC)
-    
+
     print("Sending status")
     message = "GS {} status: ".format(ID) + json.dumps(status)
     mqtt_client.publish(STATUS_TOPIC, message)
 
     GS.mqtt_client = mqtt_client
 
+
 def send_cache_messages():
     if GS.msg_cache:
-            with open("/data.txt", "r") as f:
+        with open("/data.txt", "r") as f:
+            l = f.readline()
+            while l:
+                message = "Sending cached message: " + l.strip()
+                GS.mqtt_client.publish(DATA_TOPIC, message)
                 l = f.readline()
-                while l:
-                    message = "Sending cached message: " + l.strip()
-                    GS.mqtt_client.publish(DATA_TOPIC, message)
-                    l = f.readline()
-            try:
-                os.remove("/data.txt")
-            except:
-                pass
-            GS.msg_cache = 0
+        try:
+            os.remove("/data.txt")
+        except:
+            pass
+        GS.msg_cache = 0
+
 
 def check_for_commands():
     queuedUp = None
     loopOnce = True
     waitTime = 30
     print("Waiting {} seconds for commands to be sent to ground station before processing".format(waitTime))
-    GS.mqtt_client.publish(REMOTE_TOPIC, "Waiting {} seconds for commands to be sent to ground station before processing".format(waitTime))
+    GS.mqtt_client.publish(REMOTE_TOPIC,
+                           "Waiting {} seconds for commands to be sent to ground station before processing".format(
+                               waitTime))
     time.sleep(waitTime)
 
     # Loop through commands
     while loopOnce or queuedUp != None:
         loopOnce = False
         try:
-            #Grab next command
+            # Grab next command
             queuedUp = GS.mqtt_client.loop()
         except:
             print("Error on mqtt loop")
@@ -166,8 +173,8 @@ def check_for_commands():
             print(queuedUp)
         time.sleep(2)
 
+
 def main():
-    
     GS.id = ID
 
     # if we haven't slept yet, init radios
@@ -183,7 +190,6 @@ def main():
         # Temporary radio list
         # TODO move this to _init_ in GS class, and make sure its not hard coded
         GS.radios = {1: GS.R1_CS, 2: GS.R2_CS, 3: GS.R3_CS}
-
 
     print(
         "Loop: {}, Total Msgs: {}, Msgs in Cache: {}, Vbatt: {:.1f}".format(
@@ -215,7 +221,7 @@ def main():
             for msg in new_messages:
                 print("Sending message")
                 print(new_messages[msg])
-                #mqtt_client.publish(DATA_TOPIC, new_messages[msg])
+                # mqtt_client.publish(DATA_TOPIC, new_messages[msg])
                 message = "Message received: " + json.dumps(new_messages[msg])
                 GS.mqtt_client.publish(DATA_TOPIC, message)
 
@@ -247,6 +253,7 @@ def main():
     pin_alarm3 = alarm.pin.PinAlarm(pin=board.IO7, value=True, pull=False)  # radio3
     time_alarm = alarm.time.TimeAlarm(monotonic_time=time.monotonic() + GS.deep_sleep)
     alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm1, pin_alarm2, pin_alarm3)
+
 
 if __name__ == '__main__':
     main()
