@@ -1,4 +1,4 @@
 config = {
     'ID': 'A',
-    'SAT': 'RADIO'
+    'SAT': 'SAPLING'
 }

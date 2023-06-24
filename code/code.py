@@ -1,4 +1,4 @@
-import wifi, socketpool, time, alarm, rtc
+import wifi, socketpool, time, alarm, rtc, ssl
 import adafruit_requests
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from core.radio_helpers import mqtt_message, connected, subscribe, GS
@@ -7,6 +7,9 @@ from gs_config import config
 import storage, os, board, json
 from binascii import hexlify
 import time
+import digitalio
+import board
+import busio
 
 ID = config['ID']
 SAT = GS.SATELLITE[config['SAT']]
@@ -56,7 +59,7 @@ def attempt_wifi():
     # try connecting to wifi
     print("Connecting to WiFi...")
     try:
-        wifi.radio.connect(ssid=secrets['homeSSID'], password=secrets['homePass'])
+        wifi.radio.connect(ssid=secrets["homeSSID"], password=secrets["homePass"])
         # wifi.radio.connect(ssid="Stanford") # open network
         print("Signal: {}".format(wifi.radio.ap_info.rssi))
         # Create a socket pool
@@ -106,14 +109,16 @@ def get_new_messages():
 
 
 def set_up_mqtt(pool):
+
+
     mqtt_client = MQTT.MQTT(
         broker=secrets["broker"],
         port=secrets["port"],
         username=secrets["broker_username"],
         password=secrets["broker_password"],
-        socket_pool=pool,
-        is_ssl=False
+        socket_pool=pool
     )
+
     mqtt_client.on_connect = connected
     mqtt_client.on_message = mqtt_message
     mqtt_client.on_subscribe = subscribe
@@ -127,8 +132,9 @@ def set_up_mqtt(pool):
         "Battery": GS.battery_voltage,
         "WiFi_RSSI": wifi.radio.ap_info.rssi,
     }
-
+    print("test1")
     mqtt_client.connect()
+    print("connected")
     mqtt_client.subscribe(REMOTE_TOPIC)
 
     print("Sending status")
@@ -174,7 +180,6 @@ def check_for_commands():
         else:
             print(queuedUp)
         time.sleep(2)
-
 
 def main():
     GS.id = ID
@@ -234,16 +239,18 @@ def main():
 
     # if we can't connect, cache message
     else:
-        for msg in new_messages:
-            new_messages[msg]["N"] = 0  # not new
-            try:
-                storage.remount("/", False)
-                with open("/data.txt", "a") as f:
-                    f.write(json.dumps(new_messages[msg]) + "\n")
-                storage.remount("/", True)
-            except:
-                print("Cant cache msg. Connected to usb?")
-            GS.msg_cache = GS.msg_cache + 1
+        print(new_messages)
+        if new_messages != None:
+            for msg in new_messages:
+                new_messages[msg]["N"] = 0 #not new
+                try:
+                    storage.remount("/", False)
+                    with open("/data.txt", "a") as f:
+                        f.write(json.dumps(new_messages[msg]) + "\n")
+                    storage.remount("/", True)
+                except:
+                    print("Cant cache msg. Connected to usb?")
+                GS.msg_cache = GS.msg_cache + 1
 
     GS.counter = GS.counter + 1
     GS.gs_listen()
