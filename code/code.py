@@ -116,7 +116,9 @@ def set_up_mqtt(pool):
         port=secrets["port"],
         username=secrets["broker_username"],
         password=secrets["broker_password"],
-        socket_pool=pool
+        socket_pool=pool,
+        is_ssl = True,
+        ssl_context=ssl.create_default_context()
     )
 
     mqtt_client.on_connect = connected
